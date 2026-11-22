@@ -80,6 +80,16 @@ export function SignedIn({
     <section className="step-enter w-full max-w-md rounded-3xl border border-line bg-paper px-6 py-8 shadow-[0_20px_50px_rgba(28,25,21,0.06)] sm:px-8">
       <p className="text-xs uppercase tracking-[0.14em] text-muted">Signed in</p>
       <h1 className="mt-3 text-[2rem] font-medium leading-tight tracking-tight">Welcome back</h1>
+      {user.firstName || user.surname ? (
+        <p className="mt-3 text-base text-ink">
+          {[user.firstName, user.surname].filter(Boolean).join(" ")}
+        </p>
+      ) : null}
+      {user.dateOfBirth ? (
+        <p className="mt-1 text-sm text-muted">
+          Born {user.dateOfBirth.split("-").reverse().join("/")}
+        </p>
+      ) : null}
       <p className="mt-3 break-all text-base text-ink">{user.email}</p>
       <p className="mt-2 text-sm text-muted">Last sign-in {formatWhen(user.lastLoginAt)}</p>
       <p className="mt-2 text-sm text-muted">

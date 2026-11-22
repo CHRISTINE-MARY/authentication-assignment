@@ -14,12 +14,26 @@ import {
   type AuthUser,
   type LockMethods,
   type SessionState,
+  type SignupProfile,
 } from "@/lib/api";
 
 type Step = "email" | "code" | "setup" | "session";
 
+const fieldClass =
+  "mt-2 h-12 w-full rounded-2xl border border-line bg-white px-4 text-base outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
+
+function todayInputValue() {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${now.getFullYear()}-${month}-${day}`;
+}
+
 export function SignupForm() {
   const [step, setStep] = useState<Step>("email");
+  const [firstName, setFirstName] = useState("");
+  const [surname, setSurname] = useState("");
+  const [dateOfBirth, setDateOfBirth] = useState("");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -62,12 +76,16 @@ export function SignupForm() {
     setStep(hasMethod(state.methods) ? "session" : "setup");
   }
 
+  function profile(): SignupProfile {
+    return { firstName, surname, dateOfBirth };
+  }
+
   async function onEmail(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
     setPending(true);
     try {
-      await startSignup(email);
+      await startSignup(email, profile());
       setCode("");
       setStep("code");
       setCooldown(60);
@@ -83,7 +101,7 @@ export function SignupForm() {
     setError(null);
     setPending(true);
     try {
-      applySession(await verifyOtp(email, code));
+      applySession(await verifyOtp(email, code, profile()));
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not check that code.");
     } finally {
@@ -96,7 +114,7 @@ export function SignupForm() {
     setError(null);
     setPending(true);
     try {
-      await startSignup(email);
+      await startSignup(email, profile());
       setCooldown(60);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not resend the code.");
@@ -170,21 +188,71 @@ export function SignupForm() {
       <p className="mt-3 text-sm leading-6 text-muted">
         For a new email. We send a code to confirm it, then you set a fingerprint, passkey, or passcode.
       </p>
-      <form className="mt-8" onSubmit={onEmail} aria-busy={pending}>
-        <label htmlFor="signup-email" className="text-sm font-medium">
-          Email
-        </label>
-        <input
-          id="signup-email"
-          name="email"
-          type="email"
-          required
-          autoComplete="email"
-          className="mt-2 h-12 w-full rounded-2xl border border-line bg-white px-4 text-base outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-          value={email}
-          aria-invalid={error ? true : undefined}
-          onChange={(event) => setEmail(event.target.value)}
-        />
+      <form className="mt-8 space-y-4" onSubmit={onEmail} aria-busy={pending}>
+        <div>
+          <label htmlFor="signup-first-name" className="text-sm font-medium">
+            First name
+          </label>
+          <input
+            id="signup-first-name"
+            name="given-name"
+            type="text"
+            required
+            autoComplete="given-name"
+            maxLength={80}
+            className={fieldClass}
+            value={firstName}
+            onChange={(event) => setFirstName(event.target.value)}
+          />
+        </div>
+        <div>
+          <label htmlFor="signup-surname" className="text-sm font-medium">
+            Surname
+          </label>
+          <input
+            id="signup-surname"
+            name="family-name"
+            type="text"
+            required
+            autoComplete="family-name"
+            maxLength={80}
+            className={fieldClass}
+            value={surname}
+            onChange={(event) => setSurname(event.target.value)}
+          />
+        </div>
+        <div>
+          <label htmlFor="signup-dob" className="text-sm font-medium">
+            Date of birth
+          </label>
+          <input
+            id="signup-dob"
+            name="bday"
+            type="date"
+            required
+            autoComplete="bday"
+            max={todayInputValue()}
+            className={fieldClass}
+            value={dateOfBirth}
+            onChange={(event) => setDateOfBirth(event.target.value)}
+          />
+        </div>
+        <div>
+          <label htmlFor="signup-email" className="text-sm font-medium">
+            Email
+          </label>
+          <input
+            id="signup-email"
+            name="email"
+            type="email"
+            required
+            autoComplete="email"
+            className={fieldClass}
+            value={email}
+            aria-invalid={error ? true : undefined}
+            onChange={(event) => setEmail(event.target.value)}
+          />
+        </div>
         {error ? (
           <p className="mt-3 text-sm text-danger" role="alert">
             {error}
@@ -193,7 +261,13 @@ export function SignupForm() {
         <button
           type="submit"
           className="pressable pressable-accent mt-6 h-12 w-full rounded-full bg-accent font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
-          disabled={pending || !email.includes("@")}
+          disabled={
+            pending ||
+            !firstName.trim() ||
+            !surname.trim() ||
+            !dateOfBirth ||
+            !email.includes("@")
+          }
         >
           {pending ? "Sending code…" : "Send confirmation code"}
         </button>

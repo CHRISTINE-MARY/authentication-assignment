@@ -146,7 +146,9 @@ export async function fingerprintRegisterOptions(
     rpID,
     userName: session.user.email,
     userID: new TextEncoder().encode(session.user.id),
-    userDisplayName: session.user.email,
+    userDisplayName:
+      [session.user.firstName, session.user.surname].filter(Boolean).join(" ") ||
+      session.user.email,
     attestationType: "none",
     ...(kind === "fingerprint" ? { preferredAuthenticatorType: "localDevice" as const } : {}),
     authenticatorSelection: {

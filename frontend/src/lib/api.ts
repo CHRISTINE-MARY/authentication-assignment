@@ -6,8 +6,17 @@ import {
 export type AuthUser = {
   id: string;
   email: string;
+  firstName: string | null;
+  surname: string | null;
+  dateOfBirth: string | null;
   createdAt: string;
   lastLoginAt: string | null;
+};
+
+export type SignupProfile = {
+  firstName: string;
+  surname: string;
+  dateOfBirth: string;
 };
 
 export type LockMethods = {
@@ -68,10 +77,10 @@ async function request<T>(
   return data as T;
 }
 
-export function startSignup(email: string) {
+export function startSignup(email: string, profile: SignupProfile) {
   return request<{ ok: true }>("/api/auth/signup/start", {
     method: "POST",
-    body: { email },
+    body: { email, ...profile },
   });
 }
 
@@ -119,10 +128,10 @@ export function resetPasscode(email: string, code: string, passcode: string) {
   });
 }
 
-export function verifyOtp(email: string, code: string) {
+export function verifyOtp(email: string, code: string, profile?: SignupProfile) {
   return request<{ token: string } & SessionState>("/api/auth/verify-otp", {
     method: "POST",
-    body: { email, code },
+    body: { email, code, ...profile },
   });
 }
 

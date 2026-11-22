@@ -13,6 +13,9 @@ import { query, withTransaction } from "./supabase";
 type UserRow = {
   id: string;
   email: string;
+  first_name: string | null;
+  surname: string | null;
+  date_of_birth: string | null;
   created_at: Date;
   last_login_at: Date | null;
 };
@@ -20,9 +23,21 @@ type UserRow = {
 export type AuthUser = {
   id: string;
   email: string;
+  firstName: string | null;
+  surname: string | null;
+  dateOfBirth: string | null;
   createdAt: string;
   lastLoginAt: string | null;
 };
+
+type SignupProfile = {
+  firstName: string;
+  surname: string;
+  dateOfBirth: string;
+};
+
+const USER_FIELDS =
+  "id, email, first_name, surname, date_of_birth::text as date_of_birth, created_at, last_login_at";
 
 export type LockMethods = {
   passcode: boolean;
@@ -73,10 +88,58 @@ function toUser(row: UserRow): AuthUser {
   return {
     id: row.id,
     email: row.email,
+    firstName: row.first_name,
+    surname: row.surname,
+    dateOfBirth: row.date_of_birth,
     createdAt: new Date(row.created_at).toISOString(),
     lastLoginAt: row.last_login_at
       ? new Date(row.last_login_at).toISOString()
       : null,
+  };
+}
+
+function normalizeName(value: unknown, label: "first name" | "surname") {
+  if (typeof value !== "string") {
+    throw new HttpError(400, `Enter your ${label}.`);
+  }
+  const name = value.trim().replace(/\s+/g, " ");
+  if (name.length < 1 || name.length > 80 || !/^[\p{L}][\p{L}\s.'’-]*$/u.test(name)) {
+    throw new HttpError(400, `Enter your ${label}.`);
+  }
+  return name;
+}
+
+function normalizeDateOfBirth(value: unknown) {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    throw new HttpError(400, "Enter your date of birth.");
+  }
+  const year = Number(value.slice(0, 4));
+  const month = Number(value.slice(5, 7));
+  const day = Number(value.slice(8, 10));
+  const date = new Date(Date.UTC(year, month - 1, day));
+  const today = new Date();
+  const todayUtc = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
+  const valid =
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day &&
+    year >= 1900 &&
+    date.getTime() <= todayUtc;
+  if (!valid) {
+    throw new HttpError(400, "Enter your date of birth.");
+  }
+  return value;
+}
+
+function normalizeProfile(value: unknown): SignupProfile {
+  if (!value || typeof value !== "object") {
+    throw new HttpError(400, "Enter your first name, surname, and date of birth.");
+  }
+  const body = value as Record<string, unknown>;
+  return {
+    firstName: normalizeName(body.firstName, "first name"),
+    surname: normalizeName(body.surname, "surname"),
+    dateOfBirth: normalizeDateOfBirth(body.dateOfBirth),
   };
 }
 
@@ -119,6 +182,9 @@ type SessionRow = {
   unlocked_at: Date | null;
   id: string;
   email: string;
+  first_name: string | null;
+  surname: string | null;
+  date_of_birth: string | null;
   created_at: Date;
   last_login_at: Date | null;
   passcode_hash: string | null;
@@ -142,7 +208,8 @@ function toClientState(session: SessionRecord): SessionState {
 async function loadSession(token: string) {
   const rows = await query<SessionRow>(
     `select s.id as session_id, s.device_id, s.unlocked_at,
-            u.id, u.email, u.created_at, u.last_login_at,
+            u.id, u.email, u.first_name, u.surname,
+            u.date_of_birth::text as date_of_birth, u.created_at, u.last_login_at,
             u.passcode_hash, u.passcode_attempts,
             ${methodFlags("s.device_id")}
      from auth_app.sessions s
@@ -299,8 +366,9 @@ async function sendEmailCode(email: string, purpose: "confirm" | "reset" = "conf
   }
 }
 
-export async function startSignup(emailInput: unknown) {
+export async function startSignup(emailInput: unknown, profileInput: unknown) {
   const email = normalizeEmail(emailInput);
+  normalizeProfile(profileInput);
   const existing = await query<{ id: string }>(
     "select id from auth_app.users where email = $1",
     [email],
@@ -352,7 +420,7 @@ export async function signInWithPasscode(
     const found = await client.query<
       UserRow & { passcode_hash: string | null; passcode_attempts: number }
     >(
-      `select id, email, created_at, last_login_at, passcode_hash, passcode_attempts
+      `select ${USER_FIELDS}, passcode_hash, passcode_attempts
        from auth_app.users
        where email = $1
        for update`,
@@ -409,7 +477,7 @@ export async function establishSession(userId: string, deviceId: string) {
       `update auth_app.users
        set last_login_at = now(), updated_at = now(), passcode_attempts = 0
        where id = $1
-       returning id, email, created_at, last_login_at`,
+       returning ${USER_FIELDS}`,
       [userId],
     );
     const user = found.rows[0];
@@ -458,14 +526,25 @@ async function consumeEmailCode(client: PoolClient, email: string, code: string)
   return true;
 }
 
-async function userByEmail(client: PoolClient, email: string) {
+async function userByEmail(client: PoolClient, email: string, profile: SignupProfile | null) {
   const found = await client.query<UserRow>(
-    `insert into auth_app.users (id, email, last_login_at)
-     values ($1, $2, now())
+    `insert into auth_app.users (id, email, first_name, surname, date_of_birth, last_login_at)
+     values ($1, $2, $3, $4, $5::date, now())
      on conflict (email)
-     do update set last_login_at = now(), updated_at = now()
-     returning id, email, created_at, last_login_at`,
-    [randomUUID(), email],
+     do update set
+       last_login_at = now(),
+       updated_at = now(),
+       first_name = coalesce(users.first_name, excluded.first_name),
+       surname = coalesce(users.surname, excluded.surname),
+       date_of_birth = coalesce(users.date_of_birth, excluded.date_of_birth)
+     returning ${USER_FIELDS}`,
+    [
+      randomUUID(),
+      email,
+      profile?.firstName ?? null,
+      profile?.surname ?? null,
+      profile?.dateOfBirth ?? null,
+    ],
   );
   const user = found.rows[0];
   if (!user) throw new Error("User row was not returned.");
@@ -476,13 +555,19 @@ export async function verifyOtp(
   emailInput: unknown,
   codeInput: unknown,
   deviceId: string,
+  profileInput: unknown,
 ) {
   const email = normalizeEmail(emailInput);
   const code = normalizeCode(codeInput);
   const result = await withTransaction(async (client) => {
     await client.query("select pg_advisory_xact_lock(hashtext($1))", [`verify:${email}`]);
+    const existing = await client.query<{ id: string }>(
+      "select id from auth_app.users where email = $1",
+      [email],
+    );
+    const profile = existing.rows[0] ? null : normalizeProfile(profileInput);
     if (!(await consumeEmailCode(client, email, code))) return { ok: false as const };
-    const user = await userByEmail(client, email);
+    const user = await userByEmail(client, email, profile);
     const session = await openSession(client, user, deviceId, false);
     return { ok: true as const, ...session };
   });
@@ -537,7 +622,7 @@ export async function resetPasscode(
   const result = await withTransaction(async (client) => {
     await client.query("select pg_advisory_xact_lock(hashtext($1))", [`verify:${email}`]);
     const found = await client.query<UserRow>(
-      `select id, email, created_at, last_login_at
+      `select ${USER_FIELDS}
        from auth_app.users
        where email = $1
        for update`,

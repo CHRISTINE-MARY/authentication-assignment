@@ -35,6 +35,9 @@ alter table auth_app.sessions enable row level security;
 
 alter table auth_app.users add column if not exists passcode_hash text;
 alter table auth_app.users add column if not exists passcode_attempts integer not null default 0;
+alter table auth_app.users add column if not exists first_name text;
+alter table auth_app.users add column if not exists surname text;
+alter table auth_app.users add column if not exists date_of_birth date;
 
 alter table auth_app.sessions add column if not exists device_id text;
 alter table auth_app.sessions add column if not exists unlocked_at timestamptz;

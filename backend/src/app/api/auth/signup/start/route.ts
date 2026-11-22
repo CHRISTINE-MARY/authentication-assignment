@@ -8,7 +8,7 @@ export async function POST(request: Request) {
   try {
     await ensureSchema();
     const body = await readJson(request);
-    const result = await startSignup(body?.email);
+    const result = await startSignup(body?.email, body);
     return json(request, result);
   } catch (error) {
     return fail(request, error);

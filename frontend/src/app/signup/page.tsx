@@ -4,7 +4,7 @@ import { SignupForm } from "@/components/signup-form";
 
 export const metadata: Metadata = {
   title: "Create account",
-  description: "Confirm your email, then set a fingerprint, passkey, or passcode.",
+  description: "Enter your name and date of birth, confirm your email, then set a fingerprint, passkey, or passcode.",
 };
 
 export default function SignupPage() {
