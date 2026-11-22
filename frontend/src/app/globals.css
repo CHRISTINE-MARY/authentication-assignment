@@ -1,0 +1,109 @@
+@import "tailwindcss";
+
+:root {
+  --background: #efeae2;
+  --foreground: #1c1915;
+  --paper: #f7f4ef;
+  --ink: #1c1915;
+  --muted: #6b645c;
+  --line: #e2dbd1;
+  --accent: #c45c26;
+  --danger: #8f2d2d;
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-paper: var(--paper);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-danger: var(--danger);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+html {
+  height: 100%;
+  color-scheme: light;
+}
+
+body {
+  min-height: 100%;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+.pressable {
+  transition:
+    transform 160ms var(--ease-out),
+    background-color 150ms ease;
+}
+
+.pressable:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .pressable-accent:hover:not(:disabled) {
+    background-color: #a34b1e;
+  }
+}
+
+.step-enter {
+  animation: step-in 200ms var(--ease-out);
+}
+
+.rise {
+  opacity: 0;
+  animation: rise 280ms var(--ease-out) forwards;
+}
+
+.rise-2 {
+  animation-delay: 50ms;
+}
+
+.rise-3 {
+  animation-delay: 100ms;
+}
+
+@keyframes step-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pressable {
+    transition: none;
+  }
+
+  .pressable:active:not(:disabled) {
+    transform: none;
+  }
+
+  .step-enter,
+  .rise {
+    opacity: 1;
+    animation: none;
+  }
+}
